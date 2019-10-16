@@ -2,29 +2,33 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
 namespace PhotoRecon
 {
     class Program
     {
+        private static ReportBuilder report = new ReportBuilder();
+        private const string reportFileName = "report.json";
+
         static void Main(string[] args)
         {
             // Old
-            var oldDirectories = GetDirectories(@"c:\pictures").Union(GetDirectories(@"d:\pictures"));
+            var sources = new[] {
+                @"c:\pictures",
+                @"d:\pictures",
+            };
+
+            var oldDirectories = GetDirectories(sources);
             var oldFiles = GetFiles(oldDirectories).ToList();
-            var oldList = FilesToDictionary(oldFiles);
+            var oldList = FilesToDictionary(LocationType.Source, oldFiles);
 
             Console.WriteLine($"Found {oldFiles.Count} files and {oldList.Count} unique files in old.");
-
-            // var oldString = JsonConvert.SerializeObject(oldFiles);
-            // File.WriteAllText(@".\original-index.json", oldString);
 
             // New
             var newDirectories = GetDirectories(@"D:\Lightroom\Lightroom CC\{libraryguid}\originals");
             var newFiles = GetFiles(newDirectories).ToList();
-            var newList = FilesToDictionary(newFiles);
+            var newList = FilesToDictionary(LocationType.Destination, newFiles);
 
             Console.WriteLine($"Found {newFiles.Count} and {newList.Count} unique files in new.");
 
@@ -45,7 +49,7 @@ namespace PhotoRecon
                     continue;
                 }
 
-                Console.WriteLine(file);
+                report.AddMissingFile(LocationType.Source, file);
             }
 
             var missingInOld = newList.Keys.Except(oldList.Keys).ToList();
@@ -64,11 +68,14 @@ namespace PhotoRecon
                     continue;
                 }
 
-                Console.WriteLine(file);
+                report.AddMissingFile(LocationType.Destination, file);
             }
+
+            report.SaveReport(reportFileName);
+            Console.WriteLine($"Report saved to {reportFileName}");
         }
 
-        public static Dictionary<string, Photo> FilesToDictionary(IEnumerable<Photo> photos)
+        public static Dictionary<string, Photo> FilesToDictionary(LocationType location, IEnumerable<Photo> photos)
         {
             var d = new Dictionary<string, Photo>();
 
@@ -77,7 +84,7 @@ namespace PhotoRecon
                 // Allow duplicates. It's only important that we've transferred the file.
                 if (d.ContainsKey(p.UniqueId))
                 {
-                    Console.WriteLine($"WARN: Already found {p} at {d[p.UniqueId]}");
+                    report.AddDuplicateFile(location, p, d[p.UniqueId]);
                 }
                 d[p.UniqueId] = p;
             }
@@ -105,26 +112,24 @@ namespace PhotoRecon
                 {
                     directories.Enqueue(new Dir()
                     {
-                        Root = dir.FullPath,
-                            FullPath = d,
+                        FullPath = d,
                     });
                 }
 
                 foreach (var file in Directory.GetFiles(dir.FullPath))
                 {
-                    if (file.EndsWith("AVI", StringComparison.InvariantCultureIgnoreCase) ||
-                        file.EndsWith("MPG", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    yield return new Photo()
+                    yield return new Photo
                     {
                         Directory = dir,
-                            FullPath = file,
+                        FullPath = file,
                     };;
                 }
             }
+        }
+
+        public static IEnumerable<Dir> GetDirectories(params string[] directories)
+        {
+            return directories.SelectMany(d => GetDirectories(d));
         }
 
         public static IEnumerable<Dir> GetDirectories(string root)
@@ -139,7 +144,7 @@ namespace PhotoRecon
                     {
                         yield return new Dir()
                         {
-                            Root = root,
+                            //Root = root,
                             FullPath = subDirectory,
                         };
                     }
@@ -150,8 +155,8 @@ namespace PhotoRecon
                 {
                     yield return new Dir
                     {
-                        Root = root,
-                        FullPath = directory,
+                        //Root = root,
+                            FullPath = directory,
                     };
                 }
             }
@@ -160,28 +165,30 @@ namespace PhotoRecon
 
     public class Dir
     {
-        [JsonIgnore]
-        public string Root { get; set; }
         public string FullPath { get; set; }
-
-        [JsonIgnore]
-        public string RelativePath
-        {
-            get
-            {
-                return FullPath.Substring(Root.Length);
-            }
-        }
-
-        public override string ToString() => RelativePath;
     }
 
     public class Photo
     {
+        private FileInfo _info;
+
         [JsonIgnore]
         public Dir Directory { get; set; }
 
         public string FullPath { get; set; }
+
+        public long Size
+        {
+            get
+            {
+                if (_info == null)
+                {
+                    _info = new System.IO.FileInfo(FullPath);
+                }
+
+                return _info.Length;
+            }
+        }
 
         [JsonIgnore]
         public string RelativePath => FullPath.Substring(Directory.FullPath.Length);
@@ -194,18 +201,11 @@ namespace PhotoRecon
         /// for hashing the file contents; it's not likely two photos have exactly the same size.
         /// </remarks>
         [JsonIgnore]
-        public string UniqueId
-        {
-            get
-            {
-                var size = new System.IO.FileInfo(FullPath).Length;
-                return $"{RelativePath},{size}".ToLowerInvariant();
-            }
-        }
+        public string UniqueId => $"{RelativePath},{Size}".ToLowerInvariant();
 
         public override string ToString()
         {
-            return $"Path={FullPath}, UniqueId={UniqueId}, DirectoryRelativePath={Directory.RelativePath}";
+            return $"Path={FullPath}, UniqueId={UniqueId}";
         }
     }
 }
