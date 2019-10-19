@@ -8,25 +8,46 @@ namespace PhotoRecon
 {
     class Program
     {
-        private static ReportBuilder report = new ReportBuilder();
         private const string reportFileName = "report.json";
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
-            // Old
             var sources = new[] {
-                @"c:\pictures",
-                @"d:\pictures",
+                @"c:\Pictures",
             };
 
-            var oldDirectories = GetDirectories(sources);
+            var destination = @"e:\Backup\Pictures";
+
+            var recon = new Reconciler();
+            var report = recon.Execute(sources, destination);
+
+            report.SaveReport(reportFileName);
+            Console.WriteLine($"Report saved to {reportFileName}");
+        }
+    }
+
+    class Reconciler
+    {
+        private static ReportBuilder report;
+
+        public Reconciler()
+        {
+
+        }
+
+        public ReportBuilder Execute(string[] sourceDirectories, string destinationDirectory)
+        {
+            report = new ReportBuilder();
+
+            // Old
+            var oldDirectories = GetDirectories(sourceDirectories);
             var oldFiles = GetFiles(oldDirectories).ToList();
             var oldList = FilesToDictionary(LocationType.Source, oldFiles);
 
             Console.WriteLine($"Found {oldFiles.Count} files and {oldList.Count} unique files in old.");
 
             // New
-            var newDirectories = GetDirectories(@"D:\Lightroom\Lightroom CC\{libraryguid}\originals");
+            var newDirectories = GetDirectories(destinationDirectory);
             var newFiles = GetFiles(newDirectories).ToList();
             var newList = FilesToDictionary(LocationType.Destination, newFiles);
 
@@ -71,8 +92,7 @@ namespace PhotoRecon
                 report.AddMissingFile(LocationType.Destination, file);
             }
 
-            report.SaveReport(reportFileName);
-            Console.WriteLine($"Report saved to {reportFileName}");
+            return report;
         }
 
         public static Dictionary<string, Photo> FilesToDictionary(LocationType location, IEnumerable<Photo> photos)
