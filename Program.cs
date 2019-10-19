@@ -138,25 +138,13 @@ namespace PhotoRecon
             foreach (var directory in directories)
             {
                 if (directory.StartsWith(root + @"\00", StringComparison.InvariantCultureIgnoreCase) ||
-                    directory.StartsWith(root + @"\20", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    foreach (var subDirectory in Directory.GetDirectories(directory))
-                    {
-                        yield return new Dir()
-                        {
-                            //Root = root,
-                            FullPath = subDirectory,
-                        };
-                    }
-                }
-
-                if (directory.StartsWith(root + @"\Grow", StringComparison.InvariantCultureIgnoreCase) ||
+                    directory.StartsWith(root + @"\20", StringComparison.InvariantCultureIgnoreCase) ||
+                    directory.StartsWith(root + @"\Grow", StringComparison.InvariantCultureIgnoreCase) ||
                     directory.StartsWith(root + @"\David", StringComparison.InvariantCultureIgnoreCase))
                 {
                     yield return new Dir
                     {
-                        //Root = root,
-                            FullPath = directory,
+                        FullPath = directory,
                     };
                 }
             }
