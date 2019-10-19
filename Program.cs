@@ -28,11 +28,12 @@ namespace PhotoRecon
 
     class Reconciler
     {
-        private static ReportBuilder report;
+        private ReportBuilder report;
+        private readonly IReadOnlyCollection<IFileFilter> _fileFilters;
 
-        public Reconciler()
+        public Reconciler(IReadOnlyCollection<IFileFilter> fileFilters)
         {
-
+            _fileFilters = fileFilters;
         }
 
         public ReportBuilder Execute(string[] sourceDirectories, string destinationDirectory)
@@ -95,7 +96,7 @@ namespace PhotoRecon
             return report;
         }
 
-        public static Dictionary<string, Photo> FilesToDictionary(LocationType location, IEnumerable<Photo> photos)
+        public Dictionary<string, Photo> FilesToDictionary(LocationType location, IEnumerable<Photo> photos)
         {
             var d = new Dictionary<string, Photo>();
 
@@ -112,7 +113,7 @@ namespace PhotoRecon
             return d;
         }
 
-        public static IEnumerable<Photo> GetFiles(IEnumerable<Dir> directories)
+        private IEnumerable<Photo> GetFiles(IEnumerable<Dir> directories)
         {
             return from directory in directories.AsParallel()
             let files = GetFiles(directory)
@@ -120,7 +121,7 @@ namespace PhotoRecon
             select f;
         }
 
-        public static IEnumerable<Photo> GetFiles(Dir directory)
+        private IEnumerable<Photo> GetFiles(Dir directory)
         {
             var directories = new Queue<Dir>();
             directories.Enqueue(directory);
