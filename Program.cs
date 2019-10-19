@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using photo_recon.Filters;
 
 namespace PhotoRecon
 {
@@ -18,7 +19,9 @@ namespace PhotoRecon
 
             var destination = @"e:\Backup\Pictures";
 
-            var recon = new Reconciler();
+            var recon = new Reconciler()
+                .ExcludeExtensions(".lrprev", ".lrmprev", ".db");
+
             var report = recon.Execute(sources, destination);
 
             report.SaveReport(reportFileName);
@@ -26,14 +29,19 @@ namespace PhotoRecon
         }
     }
 
-    class Reconciler
+    public class Reconciler
     {
         private ReportBuilder report;
-        private readonly IReadOnlyCollection<IFileFilter> _fileFilters;
+        private readonly ICollection<IFileFilter> _fileFilters;
 
-        public Reconciler(IReadOnlyCollection<IFileFilter> fileFilters)
+        public Reconciler()
         {
-            _fileFilters = fileFilters;
+            _fileFilters = new List<IFileFilter>();
+        }
+
+        public void AddFilter(IFileFilter filter)
+        {
+            _fileFilters.Add(filter);
         }
 
         public ReportBuilder Execute(string[] sourceDirectories, string destinationDirectory)
@@ -139,21 +147,27 @@ namespace PhotoRecon
 
                 foreach (var file in Directory.GetFiles(dir.FullPath))
                 {
-                    yield return new Photo
+                    foreach (var filter in _fileFilters)
                     {
-                        Directory = dir,
-                        FullPath = file,
-                    };;
+                        if (filter.Include(file))
+                        {
+                            yield return new Photo
+                            {
+                                Directory = dir,
+                                FullPath = file,
+                            };;
+                        }
+                    }
                 }
             }
         }
 
-        public static IEnumerable<Dir> GetDirectories(params string[] directories)
+        private IEnumerable<Dir> GetDirectories(params string[] directories)
         {
             return directories.SelectMany(d => GetDirectories(d));
         }
 
-        public static IEnumerable<Dir> GetDirectories(string root)
+        private IEnumerable<Dir> GetDirectories(string root)
         {
             var directories = Directory.GetDirectories(root);
             foreach (var directory in directories)
