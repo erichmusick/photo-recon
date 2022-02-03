@@ -14,13 +14,12 @@ namespace PhotoRecon
         public static void Main(string[] args)
         {
             var sources = new[] {
-                @"c:\Pictures",
+                @"/Users/erichmusick/dev/foo/a",
             };
 
-            var destination = @"e:\Backup\Pictures";
+            var destination = @"/Users/erichmusick/dev/foo/dest";
 
-            var recon = new Reconciler()
-                .ExcludeExtensions(".lrprev", ".lrmprev", ".db");
+            var recon = new Reconciler().ExcludeExtensions();
 
             var report = recon.Execute(sources, destination);
 
@@ -82,24 +81,24 @@ namespace PhotoRecon
                 report.AddMissingFile(LocationType.Source, file);
             }
 
-            var missingInOld = newList.Keys.Except(oldList.Keys).ToList();
+            // var missingInOld = newList.Keys.Except(oldList.Keys).ToList();
 
-            Console.WriteLine($"{missingInOld.Count} missing from old");
+            // Console.WriteLine($"{missingInOld.Count} missing from old");
 
-            foreach (var path in missingInOld)
-            {
-                var file = newList[path];
+            // foreach (var path in missingInOld)
+            // {
+            //     var file = newList[path];
 
-                // Transformations
-                var transformed = path.Replace("-2.", ".").Replace("-3.", ".");
-                if (oldList.ContainsKey(transformed))
-                {
-                    //Console.WriteLine($"Found {path} at {transformed}");
-                    continue;
-                }
+            //     // Transformations
+            //     var transformed = path.Replace("-2.", ".").Replace("-3.", ".");
+            //     if (oldList.ContainsKey(transformed))
+            //     {
+            //         //Console.WriteLine($"Found {path} at {transformed}");
+            //         continue;
+            //     }
 
-                report.AddMissingFile(LocationType.Destination, file);
-            }
+            //     report.AddMissingFile(LocationType.Destination, file);
+            // }
 
             return report;
         }
@@ -136,7 +135,7 @@ namespace PhotoRecon
 
             while (directories.TryDequeue(out Dir dir))
             {
-                // Console.WriteLine($"Looking for files in {directory.FullPath}");
+                Console.WriteLine($"Looking for files in {directory.FullPath}");
                 foreach (var d in Directory.GetDirectories(dir.FullPath))
                 {
                     directories.Enqueue(new Dir()
@@ -169,19 +168,22 @@ namespace PhotoRecon
 
         private IEnumerable<Dir> GetDirectories(string root)
         {
+            // Include root itself.
+            yield return new Dir { FullPath = root };
+
             var directories = Directory.GetDirectories(root);
             foreach (var directory in directories)
             {
-                if (directory.StartsWith(root + @"\00", StringComparison.InvariantCultureIgnoreCase) ||
-                    directory.StartsWith(root + @"\20", StringComparison.InvariantCultureIgnoreCase) ||
-                    directory.StartsWith(root + @"\Grow", StringComparison.InvariantCultureIgnoreCase) ||
-                    directory.StartsWith(root + @"\David", StringComparison.InvariantCultureIgnoreCase))
-                {
+                // if (directory.StartsWith(root + @"\00", StringComparison.InvariantCultureIgnoreCase) ||
+                //     directory.StartsWith(root + @"\20", StringComparison.InvariantCultureIgnoreCase) ||
+                //     directory.StartsWith(root + @"\Grow", StringComparison.InvariantCultureIgnoreCase) ||
+                //     directory.StartsWith(root + @"\David", StringComparison.InvariantCultureIgnoreCase))
+                // {
                     yield return new Dir
                     {
                         FullPath = directory,
                     };
-                }
+                //}
             }
         }
     }
