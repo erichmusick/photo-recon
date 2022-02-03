@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using MediaDevices;
 using Newtonsoft.Json;
 using photo_recon.Filters;
 
@@ -14,13 +15,14 @@ namespace PhotoRecon
         public static void Main(string[] args)
         {
             var sources = new[] {
-                @"/Users/erichmusick/dev/foo/a",
+                @"\Internal storage/WhatsApp/Media/WhatsApp Images dupes",
+                //@"\Internal storage\Android\media\com.whatsapp\WhatsApp\Media\WhatsApp Images dupes",
             };
 
-            var destination = @"/Users/erichmusick/dev/foo/dest";
+            var destination = @"\Internal storage\Android\media\com.whatsapp\WhatsApp\Media\WhatsApp Images";
+
 
             var recon = new Reconciler().ExcludeExtensions();
-
             var report = recon.Execute(sources, destination);
 
             report.SaveReport(reportFileName);
@@ -48,15 +50,15 @@ namespace PhotoRecon
             report = new ReportBuilder();
 
             // Old
-            var oldDirectories = GetDirectories(sourceDirectories);
-            var oldFiles = GetFiles(oldDirectories).ToList();
+            //var oldDirectories = GetDirectories(sourceDirectories);
+            var oldFiles = GetFilesFromDevice(sourceDirectories).ToList();
             var oldList = FilesToDictionary(LocationType.Source, oldFiles);
 
             Console.WriteLine($"Found {oldFiles.Count} files and {oldList.Count} unique files in old.");
 
             // New
-            var newDirectories = GetDirectories(destinationDirectory);
-            var newFiles = GetFiles(newDirectories).ToList();
+            //var newDirectories = GetDirectories(destinationDirectory);
+            var newFiles =  GetFilesFromDevice(new[] {destinationDirectory}).ToList();
             var newList = FilesToDictionary(LocationType.Destination, newFiles);
 
             Console.WriteLine($"Found {newFiles.Count} and {newList.Count} unique files in new.");
@@ -71,12 +73,13 @@ namespace PhotoRecon
                 var file = oldList[path];
 
                 // Transformations
-                var transformed = path.Replace(".jpg", "-2.jpg");
-                if (newList.ContainsKey(transformed))
-                {
-                    // Console.WriteLine($"Found {path} at {transformed}");
-                    continue;
-                }
+                // var transformed = path.Replace(".jpg", "-2.jpg");
+                // if (newList.ContainsKey(transformed))
+                // {
+                //     if (newList[transformed].Length != path.)
+                //     // Console.WriteLine($"Found {path} at {transformed}");
+                //     continue;
+                // }
 
                 report.AddMissingFile(LocationType.Source, file);
             }
@@ -128,6 +131,34 @@ namespace PhotoRecon
             select f;
         }
 
+        private IEnumerable<Photo> GetFilesFromDevice(IEnumerable<string> directories)
+        {
+            // return from directory in directories.AsParallel()
+            // let files = GetFiles(directory)
+            // from f in files
+            // select f;
+            var devices = MediaDevice.GetDevices();
+            using (var device = devices.First(d => d.FriendlyName == "Galaxy S21 5G"))
+            {
+                device.Connect();
+                foreach (var dir in directories)
+                {
+                    var photoDir = device.GetDirectoryInfo(dir);//@"\Phone\DCIM\Camera");
+                    var files = photoDir.EnumerateFiles("*.*", SearchOption.TopDirectoryOnly);
+                    foreach (var f in files)
+                    {
+                        yield return new Photo {
+                            Directory = new Dir{ FullPath = dir },
+                            FullPath = f.FullName,
+                            Size = f.Length
+                        };
+                    }
+                }
+
+                device.Disconnect();
+            }
+        }
+
         private IEnumerable<Photo> GetFiles(Dir directory)
         {
             var directories = new Queue<Dir>();
@@ -154,7 +185,7 @@ namespace PhotoRecon
                             {
                                 Directory = dir,
                                 FullPath = file,
-                            };;
+                            };
                         }
                     }
                 }
@@ -195,25 +226,14 @@ namespace PhotoRecon
 
     public class Photo
     {
-        private FileInfo _info;
+        //private FileInfo _info;
 
         [JsonIgnore]
         public Dir Directory { get; set; }
 
         public string FullPath { get; set; }
 
-        public long Size
-        {
-            get
-            {
-                if (_info == null)
-                {
-                    _info = new System.IO.FileInfo(FullPath);
-                }
-
-                return _info.Length;
-            }
-        }
+        public ulong Size { get; set; }
 
         [JsonIgnore]
         public string RelativePath => FullPath.Substring(Directory.FullPath.Length);
